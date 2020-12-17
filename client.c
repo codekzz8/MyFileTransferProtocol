@@ -13,8 +13,8 @@
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
-//#include "operations.h" //Pentru operarea cu directoare/fisiere (functionalitatile urmeaza a fi introduse in proiectul final)
-#include "find.h" //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
+#include "operations.h" //Pentru operarea cu directoare/fisiere (functionalitatile urmeaza a fi introduse in proiectul final)
+#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
@@ -24,21 +24,40 @@ int port;
 
 void printCommands()
 {
-    printf("---------------------------------------------\n");
+    printf("----------------------------------------------------------------------\n");
     printf("[+] Comenzi disponibile:\n");
     printf("    - help                         // Afisare comenzi\n");
-    printf("    - listdirs_client              // Afisare directoare\n");
-    printf("    - listdirs_server              // Afisare directoare\n");
-    printf("    - goto_client 'nume_director'  // Schimbare director client\n");
-    printf("    - goto_server 'nume_director'  // Schimbare director server\n");
-    printf("    - find_client 'nume_fisier'    // Cautare fisier client\n");
-    printf("    - find_server 'nume_fisier'    // Cautare fisier server\n");
-    printf("    - info_client 'nume_fisier'    // Afisare informatii fisier client\n");
-    printf("    - info_server 'nume_fisier'    // Afisare informatii fisier server\n");
+
+    printf("    - cpwd                         // Afisare path client\n");
+    printf("    - spwd                         // Afisare path server\n");
+
+    printf("    - clistdirs                    // Afisare directoare client\n");
+    printf("    - slistdirs                    // Afisare directoare server\n");
+
+    printf("    - cmkdir 'nume_director'       // Creare director client\n");
+    printf("    - smkdir 'nume_director'       // Creare director server\n");
+    printf("    - crmdir 'nume_director'       // Stergere director client\n");
+    printf("    - srmdir 'nume_director'       // Stergere director server\n");
+
+    printf("    - ctouch 'nume_fisier'         // Creare fisier client\n");
+    printf("    - stouch 'nume_fisier'         // Creare fisier server\n");
+    printf("    - crm 'nume_fisier'            // Stergere fisier client\n");
+    printf("    - srm 'nume_fisier'            // Stergere fisier server\n");
+
+    printf("    - cgoto 'nume_director'        // Schimbare director client\n");
+    printf("    - sgoto 'nume_director'        // Schimbare director server\n");
+
+    printf("    - cfind 'nume_fisier'          // Cautare fisier client\n");
+    printf("    - sfind 'nume_fisier'          // Cautare fisier server\n");
+
+    printf("    - cinfo 'nume_fisier'          // Afisare informatii fisier client\n");
+    printf("    - sinfo'nume_fisier'           // Afisare informatii fisier server\n");
+
     printf("    - getfile 'nume_fisier'        // Transfer fisier server -> client\n");
     printf("    - sendfile 'nume_fisier'       // Transfer fisier client -> server\n");
+
     printf("    - exit                         // Terminarea conexiunii\n");
-    printf("---------------------------------------------\n");
+    printf("----------------------------------------------------------------------\n");
 }
 
 bool clientCommand(char comanda[], char path[])
@@ -49,6 +68,7 @@ bool clientCommand(char comanda[], char path[])
     bool pr = false;
     bzero(param, 100);
     bzero(rez, 200);
+    bzero(currentPath, 100);
 
     for (i = 0; comanda[i]; i++)
     {
@@ -59,16 +79,120 @@ bool clientCommand(char comanda[], char path[])
     }
     param[length] = '\0';
 
-    if (strcmp(comanda, "listdirs_client") == 0)
+    if (strcmp(comanda, "cpwd") == 0)
     {
-        printf("[+] Directoarele de pe client sunt:\n");
-        printf("    - cl1\n");
-        printf("    - cl2\n");
-        printf("    - cl3\n");
-        printf("    - ...\n");
+        printf("[+] Path-ul curent este:\n");
+        printf("    %s\n", path);
         return true;
     }
-    else if (strncmp(comanda, "goto_client", 11) == 0)
+    else if (strcmp(comanda, "clistdirs") == 0)
+    {
+        char **rezultat = malloc(50 * sizeof(char *));
+        int i;
+        for (i = 0; i < 50; i++)
+            rezultat[i] = malloc(200 * sizeof(char));
+
+        listdir(path, 0, rezultat, 1);
+        int lineNr = atoi(rezultat[0]);
+        printf("%d\n", lineNr);
+        sprintf(rezultat[1], "[+] Directoarele de pe client sunt:\n");
+        printf("%s", rezultat[1]);
+        for (i = 2; i <= lineNr; i++)
+        {
+            printf("%s\n", rezultat[i]);
+        }
+        for (i = 0; i < 50; i++)
+            free(rezultat[i]);
+        free(rezultat);
+        rezultat = NULL;
+        return true;
+    }
+    else if (strncmp(comanda, "cmkdir", 6) == 0) //123
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("mkdir", "mkdir", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        printf("[+] Directorul cu numele %s a fost creat cu succes!\n", dir_name);
+        return true;
+    }
+    else if (strncmp(comanda, "crmdir", 6) == 0) //123
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("rmdir", "rmdir", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+        return true;
+    }
+    else if (strncmp(comanda, "ctouch", 6) == 0)
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+
+        int pid = fork();
+        if (pid == 0)
+        {
+            execlp("touch", "touch", currentPath, NULL);
+            exit(0);
+        }
+        else
+        {
+            wait(NULL);
+        }
+        printf("[+] Fisierul cu numele %s a fost creat cu succes!\n", param);
+        return true;
+    }
+    else if (strncmp(comanda, "crm", 3) == 0)
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("rm", "rm", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+        return true;
+    }
+    else if (strncmp(comanda, "cgoto", 5) == 0)
     {
         if (strcmp(param, "~") == 0)
             strcpy(path, "~");
@@ -86,15 +210,17 @@ bool clientCommand(char comanda[], char path[])
             strcat(path, "/");
             strcat(path, param);
         }
-        printf("[+] Path-ul curent este: %s.\n", path);
+
+        printf("[+] Path-ul curent este:\n");
+        printf("    %s\n", path);
         return true;
     }
-    else if (strncmp(comanda, "find_client", 11) == 0)
+    else if (strncmp(comanda, "cfind", 5) == 0)
     {
         printf("[+] Fisierul cu numele %s nu a fost gasit!\n", param);
         return true;
     }
-    else if (strncmp(comanda, "info_client", 11) == 0)
+    else if (strncmp(comanda, "cinfo", 5) == 0)
     {
         printf("[+] Se afiseaza toate informatiile despre fisierul cu numele %s!\n", param);
         return true;
@@ -110,7 +236,6 @@ int main(int argc, char *argv[])
     char buff[8192];
 
     char path[100];
-    strcpy(path, "~");
 
     char username[100], parola[100];
     char option[200];
@@ -206,6 +331,32 @@ int main(int argc, char *argv[])
         }
     }
 
+    /* Dupa autentificare, se afla directorul curent al clientului */
+    int pipefd[2];
+    pipe(pipefd);
+    int pid = fork();
+    if (pid == 0)
+    {
+        close(pipefd[0]);
+        dup2(pipefd[1], 1);
+        dup2(pipefd[1], 2);
+        close(pipefd[1]);
+        execlp("pwd", "pwd", NULL);
+        exit(0);
+    }
+    else
+    {
+        wait(NULL);
+        char pwd[100];
+        bzero(pwd, 100);
+        close(pipefd[1]);
+        if (read(pipefd[0], pwd, sizeof(pwd)) > 0)
+        {
+            strcpy(path, pwd);
+            path[strlen(path) - 1] = '\0';
+        }
+    }
+
     printCommands();
 
     while (1)
@@ -235,7 +386,7 @@ int main(int argc, char *argv[])
                     perror("[+] Eroare la read() de la server.\n");
                     return errno;
                 }
-                int nrLines = msg[0] - '0', i;
+                int nrLines = atoi(msg), i;
                 for (i = 0; i < nrLines; i++)
                 {
                     bytes_read = read(sd, msg, 200);

@@ -12,8 +12,8 @@
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
-//#include "operations.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
-#include "find.h" //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
+#include "operations.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
+#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* portul folosit */
 #define PORT 2728
@@ -56,16 +56,107 @@ void commandManager(char comanda[], char path[], char **rezultat)
         strcpy(rezultat[0], "1");
         strcpy(rezultat[1], "[+] Se inchide conexiunea...");
     }
-    else if (strcmp(comanda, "listdirs_server") == 0)
+    else if (strcmp(comanda, "spwd") == 0)
     {
-        strcpy(rezultat[0], "5");
-        strcpy(rezultat[1], "[+] Directoarele de pe server sunt:");
-        strcpy(rezultat[2], "    - sv1");
-        strcpy(rezultat[3], "    - sv2");
-        strcpy(rezultat[4], "    - sv3");
-        strcpy(rezultat[5], "    - ...");
+        strcpy(rezultat[0], "2");
+        strcpy(rezultat[1], "[+] Path-ul curent este:");
+        sprintf(rezultat[2], "    %s", path);
     }
-    else if (strncmp(comanda, "goto_server", 11) == 0)
+    else if (strcmp(comanda, "slistdirs") == 0)
+    {
+        listdir(path, 0, rezultat, 1);
+        sprintf(rezultat[1], "[+] Directoarele de pe server sunt:");
+    }
+    else if (strncmp(comanda, "smkdir", 6) == 0) //123
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("mkdir", "mkdir", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        strcpy(rezultat[0], "1");
+        sprintf(rezultat[1], "[+] Directorul cu numele %s a fost creat cu succes!", dir_name);
+        //printf("[+] Directorul cu numele %s a fost creat cu succes!\n", dir_name);
+    }
+    else if (strncmp(comanda, "srmdir", 6) == 0) //123
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("rmdir", "rmdir", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        strcpy(rezultat[0], "1");
+        sprintf(rezultat[1], "[+] Directorul cu numele %s a fost sters cu succes!", dir_name);
+        //printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+    }
+    else if (strncmp(comanda, "stouch", 6) == 0)
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+
+        int pid = fork();
+        if (pid == 0)
+        {
+            execlp("touch", "touch", currentPath, NULL);
+            exit(0);
+        }
+        else
+        {
+            wait(NULL);
+        }
+        strcpy(rezultat[0], "1");
+        sprintf(rezultat[1], "[+] Fisierul cu numele %s a fost creat cu succes!", param);
+        //printf("[+] Fisierul cu numele %s a fost creat cu succes!\n", param);
+    }
+    else if (strncmp(comanda, "srm", 3) == 0)
+    {
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
+        {
+            execlp("rm", "rm", currentPath, NULL);
+            exit(0);
+        }
+        //proces parinte
+        wait(NULL);
+        char dir_name[20];
+        bzero(dir_name, 20);
+        if (strchr(comanda, '/'))
+            strcpy(dir_name, strrchr(param, '/') + 1);
+        else
+            strcpy(dir_name, param);
+        strcpy(rezultat[0], "1");
+        sprintf(rezultat[1], "[+] Directorul cu numele %s a fost sters cu succes!", dir_name);
+        //printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+    }
+    else if (strncmp(comanda, "sgoto", 5) == 0)
     {
         if (strcmp(param, "~") == 0)
             strcpy(path, "~");
@@ -86,12 +177,12 @@ void commandManager(char comanda[], char path[], char **rezultat)
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Path-ul curent este: %s.", path);
     }
-    else if (strncmp(comanda, "find_server", 11) == 0)
+    else if (strncmp(comanda, "sfind", 5) == 0)
     {
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Fisierul cu numele %s a fost gasit!", param);
     }
-    else if (strncmp(comanda, "info_server", 11) == 0)
+    else if (strncmp(comanda, "sinfo", 5) == 0)
     {
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Se afiseaza toate informatiile despre fisierul cu numele %s!", param);
@@ -140,7 +231,9 @@ int receiveAndSend(int fd, char path[])
         perror("[server] Eroare la write() catre client.\n");
         return 0;
     }
-    nrLines = rezultat[0][0] - '0';
+    //nrLines = rezultat[0][0] - '0';
+    nrLines = atoi(rezultat[0]);
+    printf("lines = %d\n", nrLines);
     for (i = 1; i <= nrLines; i++)
     {
         if (write(fd, rezultat[i], bytes) < 0)
@@ -174,6 +267,33 @@ int main()
     char status[10][1];  //0 = nu e logat | 1 = s-a logat | 2 = este pe blacklist
     char mesaj[200];
     bool authenticated[10]; //1 = s-a dorit autentificarea | 0 = s-a dorit deconectarea
+    char path[100];
+
+    /* Dupa autentificare, se afla directorul curent al clientului */
+    int pipefd[2];
+    pipe(pipefd);
+    int pid = fork();
+    if (pid == 0)
+    {
+        close(pipefd[0]);
+        dup2(pipefd[1], 1);
+        dup2(pipefd[1], 2);
+        close(pipefd[1]);
+        execlp("pwd", "pwd", NULL);
+        exit(0);
+    }
+    else
+    {
+        wait(NULL);
+        char pwd[100];
+        bzero(pwd, 100);
+        close(pipefd[1]);
+        if (read(pipefd[0], pwd, sizeof(pwd)) > 0)
+        {
+            strcpy(path, pwd);
+            path[strlen(path) - 1] = '\0';
+        }
+    }
 
     /* creare socket */
     if ((sd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -242,7 +362,8 @@ int main()
 
             /* a venit un client, acceptam conexiunea */
             client = accept(sd, (struct sockaddr *)&from, &len);
-            strcpy(paths[client], "~");
+            //strcpy(paths[client], "~");
+            strcpy(paths[client], path);
             status[client][0] = '0';
             authenticated[client] = false;
 
