@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <math.h>
 
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
@@ -35,7 +36,10 @@ char *conv_addr(struct sockaddr_in address)
     return (str);
 }
 
-void commandManager(char comanda[], char path[], char **rezultat)
+int client;
+struct sockaddr_in from;
+
+void commandManager(int fd, char comanda[], char path[], char **rezultat)
 {
     int i;
     char rez[200], param[100], currentPath[100];
@@ -88,7 +92,6 @@ void commandManager(char comanda[], char path[], char **rezultat)
             strcpy(dir_name, param);
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Directorul cu numele %s a fost creat cu succes!", dir_name);
-        //printf("[+] Directorul cu numele %s a fost creat cu succes!\n", dir_name);
     }
     else if (strncmp(comanda, "srmdir", 6) == 0) //123
     {
@@ -111,7 +114,6 @@ void commandManager(char comanda[], char path[], char **rezultat)
             strcpy(dir_name, param);
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Directorul cu numele %s a fost sters cu succes!", dir_name);
-        //printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
     }
     else if (strncmp(comanda, "stouch", 6) == 0)
     {
@@ -131,7 +133,6 @@ void commandManager(char comanda[], char path[], char **rezultat)
         }
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Fisierul cu numele %s a fost creat cu succes!", param);
-        //printf("[+] Fisierul cu numele %s a fost creat cu succes!\n", param);
     }
     else if (strncmp(comanda, "srm", 3) == 0)
     {
@@ -154,7 +155,33 @@ void commandManager(char comanda[], char path[], char **rezultat)
             strcpy(dir_name, param);
         strcpy(rezultat[0], "1");
         sprintf(rezultat[1], "[+] Directorul cu numele %s a fost sters cu succes!", dir_name);
-        //printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+    }
+    else if (strncmp(comanda, "srename", 7) == 0)
+    {
+        char newName[100];
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcpy(newName, path);
+        strcat(newName, "/");
+        strcat(newName, strchr(param, '>') + 2);
+        for (i = 0; param[i]; i++) //crename fis 3 -> xd
+        {
+            if (param[i] == '>')
+            {
+                param[i - 2] = '\0';
+                break;
+            }
+        }
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0)
+        {
+            execlp("mv", "mv", currentPath, newName, NULL);
+            exit(0);
+        }
+        wait(NULL);
+        strcpy(rezultat[0], "1");
+        sprintf(rezultat[1], "[+] Fisierul %s a fost redenumit in %s.", param, strrchr(newName, '/') + 1);
     }
     else if (strncmp(comanda, "sgoto", 5) == 0)
     {
@@ -179,24 +206,22 @@ void commandManager(char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "sfind", 5) == 0)
     {
-        strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Fisierul cu numele %s a fost gasit!", param);
+        myfind(path, param, rezultat);
     }
     else if (strncmp(comanda, "sinfo", 5) == 0)
     {
-        strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Se afiseaza toate informatiile despre fisierul cu numele %s!", param);
+        mystat(param, rezultat);
     }
     else if (strncmp(comanda, "getfile", 7) == 0)
     {
-        strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Se trimite fisierul cu numele %s de pe server!", param);
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+
+        sendfile(currentPath, client, from);
     }
     else if (strncmp(comanda, "sendfile", 8) == 0)
-    {
-        strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Se trimite fisierul cu numele %s pe server!", param);
-    }
+        printf("-----------------------------------------------\n");
     else
     {
         strcpy(rezultat[0], "1");
@@ -223,28 +248,70 @@ int receiveAndSend(int fd, char path[])
     }
     printf("[server]Mesajul a fost receptionat...%s\n", msg);
 
-    commandManager(msg, path, rezultat);
+    commandManager(fd, msg, path, rezultat);
 
-    int nrLines;
-    if (write(fd, rezultat[0], bytes) < 0)
+    if (strncmp(msg, "sendfile", 8) == 0)
     {
-        perror("[server] Eroare la write() catre client.\n");
-        return 0;
+        char filePath[100];
+        char buff[8192];
+        strcpy(filePath, path);
+        strcat(filePath, "/");
+        strcat(filePath, strchr(msg, ' ') + 1);
+
+        FILE *output = fopen(filePath, "wb");
+        output = fopen(filePath, "wb");
+        if (output == NULL)
+        {
+            perror("Eroare la deschidere fisier!\n");
+            exit(1);
+        }
+
+        size_t read_bytes, write_bytes;
+
+        int i, nrBlocks;
+
+        read_bytes = read(fd, buff, sizeof(buff));
+        nrBlocks = atoi(buff);
+        printf("nr blocks : %d\n");
+
+        bzero(buff, sizeof(buff));
+        for (i = 0; i < nrBlocks; i++)
+        {
+            read_bytes = read(fd, buff, sizeof(buff));
+            if (read_bytes < 0)
+            {
+                perror("[client]Eroare la read() de la server.\n");
+                return errno;
+            }
+            write_bytes = fwrite(buff, 1, read_bytes, output);
+            bzero(buff, sizeof(buff));
+        }
+        fclose(output);
     }
-    //nrLines = rezultat[0][0] - '0';
-    nrLines = atoi(rezultat[0]);
-    printf("lines = %d\n", nrLines);
-    for (i = 1; i <= nrLines; i++)
+    else if (strncmp(msg, "getfile", 7))
     {
-        if (write(fd, rezultat[i], bytes) < 0)
+        int nrLines;
+        if (write(fd, rezultat[0], bytes) < 0)
         {
             perror("[server] Eroare la write() catre client.\n");
             return 0;
         }
+        //nrLines = rezultat[0][0] - '0';
+        nrLines = atoi(rezultat[0]);
+        printf("lines = %d\n", nrLines);
+        for (i = 1; i <= nrLines; i++)
+        {
+            if (write(fd, rezultat[i], bytes) < 0)
+            {
+                perror("[server] Eroare la write() catre client.\n");
+                return 0;
+            }
+        }
+        printf("[server] Rezultat trimis catre client!\n");
+        if (strstr(rezultat[1], "Se inchide conexiunea"))
+            return -1;
+        return bytes;
     }
-    printf("[server] Rezultat trimis catre client!\n");
-    if (strstr(rezultat[1], "Se inchide conexiunea"))
-        return -1;
     return bytes;
 }
 
@@ -252,16 +319,15 @@ int receiveAndSend(int fd, char path[])
 int main()
 {
     struct sockaddr_in server; /* structurile pentru server si clienti */
-    struct sockaddr_in from;
-    fd_set readfds;    /* multimea descriptorilor de citire */
-    fd_set actfds;     /* multimea descriptorilor activi */
-    struct timeval tv; /* structura de timp pentru select() */
-    int sd, client;    /* descriptori de socket */
-    int optval = 1;    /* optiune folosita pentru setsockopt()*/
-    int fd;            /* descriptor folosit pentru 
+    fd_set readfds;            /* multimea descriptorilor de citire */
+    fd_set actfds;             /* multimea descriptorilor activi */
+    struct timeval tv;         /* structura de timp pentru select() */
+    int sd;                    /* descriptori de socket */
+    int optval = 1;            /* optiune folosita pentru setsockopt()*/
+    int fd;                    /* descriptor folosit pentru 
 				   parcurgerea listelor de descriptori */
-    int nfds;          /* numarul maxim de descriptori */
-    int len;           /* lungimea structurii sockaddr_in */
+    int nfds;                  /* numarul maxim de descriptori */
+    int len;                   /* lungimea structurii sockaddr_in */
 
     char paths[10][100]; //path-urile pentru fiecare client
     char status[10][1];  //0 = nu e logat | 1 = s-a logat | 2 = este pe blacklist
@@ -430,7 +496,7 @@ int main()
                         printf("[server] Utilizatorul %d s-a autentificat cu succes!\n", fd);
                     }
                 }
-                else if (receiveAndSend(fd, paths[fd]) <= 0)
+                else if (receiveAndSend(fd, paths[fd]) < 0)
                 {
                 disconnect:
                     printf("[server] S-a deconectat clientul cu descriptorul %d.\n", fd);

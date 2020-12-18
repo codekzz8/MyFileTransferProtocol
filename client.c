@@ -44,6 +44,9 @@ void printCommands()
     printf("    - crm 'nume_fisier'            // Stergere fisier client\n");
     printf("    - srm 'nume_fisier'            // Stergere fisier server\n");
 
+    printf("    - crename 'nume1' -> 'nume2'   // Redenumire fisier/director client\n");
+    printf("    - srename 'nume1' -> 'nume2'   // Redenumire fisier/director server\n");
+
     printf("    - cgoto 'nume_director'        // Schimbare director client\n");
     printf("    - sgoto 'nume_director'        // Schimbare director server\n");
 
@@ -60,7 +63,7 @@ void printCommands()
     printf("----------------------------------------------------------------------\n");
 }
 
-bool clientCommand(char comanda[], char path[])
+bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char path[])
 {
     int i;
     char rez[200], param[100], currentPath[100];
@@ -69,6 +72,10 @@ bool clientCommand(char comanda[], char path[])
     bzero(param, 100);
     bzero(rez, 200);
     bzero(currentPath, 100);
+
+    char **rezultat = malloc(50 * sizeof(char *));
+    for (i = 0; i < 50; i++)
+        rezultat[i] = malloc(200 * sizeof(char));
 
     for (i = 0; comanda[i]; i++)
     {
@@ -87,14 +94,8 @@ bool clientCommand(char comanda[], char path[])
     }
     else if (strcmp(comanda, "clistdirs") == 0)
     {
-        char **rezultat = malloc(50 * sizeof(char *));
-        int i;
-        for (i = 0; i < 50; i++)
-            rezultat[i] = malloc(200 * sizeof(char));
-
         listdir(path, 0, rezultat, 1);
         int lineNr = atoi(rezultat[0]);
-        printf("%d\n", lineNr);
         sprintf(rezultat[1], "[+] Directoarele de pe client sunt:\n");
         printf("%s", rezultat[1]);
         for (i = 2; i <= lineNr; i++)
@@ -183,13 +184,40 @@ bool clientCommand(char comanda[], char path[])
         }
         //proces parinte
         wait(NULL);
-        char dir_name[20];
-        bzero(dir_name, 20);
+        char fis_name[20];
+        bzero(fis_name, 20);
         if (strchr(comanda, '/'))
-            strcpy(dir_name, strrchr(param, '/') + 1);
+            strcpy(fis_name, strrchr(param, '/') + 1);
         else
-            strcpy(dir_name, param);
-        printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+            strcpy(fis_name, param);
+        printf("[+] Fisierul cu numele %s a fost sters cu succes!\n", fis_name);
+        return true;
+    }
+    else if (strncmp(comanda, "crename", 7) == 0)
+    {
+        char newName[100];
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcpy(newName, path);
+        strcat(newName, "/");
+        strcat(newName, strchr(param, '>') + 2);
+        for (i = 0; param[i]; i++)
+        {
+            if (param[i] == '>')
+            {
+                param[i - 2] = '\0';
+                break;
+            }
+        }
+        strcat(currentPath, param);
+        int pid = fork();
+        if (pid == 0)
+        {
+            execlp("mv", "mv", currentPath, newName, NULL);
+            exit(0);
+        }
+        wait(NULL);
+        printf("[+] Fisierul %s a fost redenumit in %s.\n", param, strrchr(newName, '/') + 1);
         return true;
     }
     else if (strncmp(comanda, "cgoto", 5) == 0)
@@ -217,12 +245,22 @@ bool clientCommand(char comanda[], char path[])
     }
     else if (strncmp(comanda, "cfind", 5) == 0)
     {
-        printf("[+] Fisierul cu numele %s nu a fost gasit!\n", param);
+        myfind(path, param, rezultat);
+        int lineNr = atoi(rezultat[0]);
+        for (i = 1; i <= lineNr; i++)
+        {
+            printf("%s\n", rezultat[i]);
+        }
         return true;
     }
     else if (strncmp(comanda, "cinfo", 5) == 0)
     {
-        printf("[+] Se afiseaza toate informatiile despre fisierul cu numele %s!\n", param);
+        mystat(param, rezultat);
+        int lineNr = atoi(rezultat[0]);
+        for (int i = 1; i <= lineNr; i++)
+        {
+            printf("%s\n", rezultat[i]);
+        }
         return true;
     }
     return false;
@@ -232,7 +270,8 @@ int main(int argc, char *argv[])
 {
     int sd;                    // descriptorul de socket
     struct sockaddr_in server; // structura folosita pentru conectare
-    char msg[200];             // mesajul trimis
+
+    char msg[200]; // mesajul trimis
     char buff[8192];
 
     char path[100];
@@ -279,8 +318,9 @@ int main(int argc, char *argv[])
     printf("-=/ MyFileTransferProtocol \\=-\n");
     printf("---------------------------------------------\n");
     printf("[+] Introduceti cifra corespunzatoare urmatoarelor optiuni:\n");
-    printf("[+] 1. Autentificare\n");
-    printf("[+] 2. Exit\n");
+    printf("[+] 1. Creare cont\n");
+    printf("[+] 2. Autentificare\n");
+    printf("[+] 3. Exit\n");
     while (1)
     {
         printf("[+] Optiune: ");
@@ -372,7 +412,64 @@ int main(int argc, char *argv[])
             printCommands();
         else
         {
-            if (!clientCommand(msg, path))
+            if (strstr(msg, "sendfile"))
+            {
+                if (write(sd, msg, 200) <= 0)
+                {
+                    perror("[+] Eroare la write() spre server.\n");
+                    return errno;
+                }
+
+                char filePath[100];
+                strcpy(filePath, path);
+                strcat(filePath, "/");
+                strcat(filePath, strchr(msg, ' ') + 1);
+                sendfile(filePath, sd, server);
+                printf("[+] Fisierul cu numele %s a fost trimis!\n", strchr(msg, ' ') + 1);
+            }
+            else if (strstr(msg, "getfile"))
+            {
+                if (write(sd, msg, 200) <= 0)
+                {
+                    perror("[+] Eroare la write() spre server.\n");
+                    return errno;
+                }
+
+                char filePath[100];
+                strcpy(filePath, path);
+                strcat(filePath, "/");
+                strcat(filePath, strchr(msg, ' ') + 1);
+
+                output = fopen(filePath, "wb");
+                if (output == NULL)
+                {
+                    perror("Eroare la deschidere fisier!\n");
+                    exit(1);
+                }
+
+                size_t read_bytes, write_bytes;
+
+                int i, nrBlocks;
+
+                bytes_read = read(sd, buff, sizeof(buff));
+                nrBlocks = atoi(buff);
+
+                bzero(buff, sizeof(buff));
+                for (i = 0; i < nrBlocks; i++)
+                {
+                    read_bytes = read(sd, buff, sizeof(buff));
+                    if (read_bytes < 0)
+                    {
+                        perror("[client]Eroare la read() de la server.\n");
+                        return errno;
+                    }
+                    write_bytes = fwrite(buff, 1, read_bytes, output);
+                    bzero(buff, sizeof(buff));
+                }
+                fclose(output);
+                printf("[+] Fisierul cu numele %s a fost primit!\n", strchr(msg, ' ') + 1);
+            }
+            else if (!clientCommand(sd, server, msg, path))
             {
                 if (write(sd, msg, 200) <= 0)
                 {
