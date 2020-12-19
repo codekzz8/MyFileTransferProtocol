@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/wait.h>
 #include <sys/time.h>
 #include <netinet/in.h>
 #include <unistd.h>
@@ -14,7 +15,7 @@
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
 #include "operations.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
-#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
+//#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* portul folosit */
 #define PORT 2728
@@ -185,9 +186,7 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "sgoto", 5) == 0)
     {
-        if (strcmp(param, "~") == 0)
-            strcpy(path, "~");
-        else if (strcmp(param, "..") == 0)
+        if (strcmp(param, "..") == 0)
         {
             for (i = strlen(path) - 1; i >= 0; i--)
             {
@@ -196,13 +195,25 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
             }
             strcpy(path + i, "");
         }
+        else if (strcmp(param, ".") == 0)
+        {
+        }
         else
         {
-            strcat(path, "/");
-            strcat(path, param);
+            findDir(path, param, rezultat);
+            if (strcmp(rezultat[1], "Director gasit") == 0)
+            {
+                strcat(path, "/");
+                strcat(path, param);
+            }
+            else
+            {
+                return;
+            }
         }
-        strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Path-ul curent este: %s.", path);
+        strcpy(rezultat[0], "2");
+        sprintf(rezultat[1], "[+] Path-ul curent este:");
+        sprintf(rezultat[2], "%s.", path);
     }
     else if (strncmp(comanda, "sfind", 5) == 0)
     {
@@ -468,6 +479,7 @@ int main()
                         perror("[server] Eroare la citire pass.\n");
                         return errno;
                     }
+                    printf("Mesajul primit : %s\n", mesaj);
                     if (strcmp(mesaj, "Exit") == 0)
                     {
                         status[fd][0] = '2';
@@ -475,7 +487,7 @@ int main()
                     }
                     authenticated[fd] = true;
                 }
-                if (status[fd][0] == '0') //Daca se cere autentificarea
+                if (status[fd][0] == '0') //Daca se cere creare cont/autentificare
                 {
                     char user[100], pass[100];
                     bzero(user, 100);
@@ -490,7 +502,11 @@ int main()
                         perror("[server] Eroare la citire pass.\n");
                         return errno;
                     }
-                    char val = getInfo(user, pass);
+                    char val;
+                    if (strcmp(mesaj, "Autentificare") == 0)
+                        val = getInfo(user, pass);
+                    else
+                        val = insertAccount(user, pass);
                     if (write(fd, &val, sizeof val) < 0)
                     {
                         perror("[server] Eroare la scriere rezultat.\n");

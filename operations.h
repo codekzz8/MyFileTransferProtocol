@@ -109,6 +109,38 @@ void mystat(const char *fileName, char **result)
     snprintf(result[9], 200, "    Data ultimei actualizari a statusului: %s", ctime(&file_stats.st_ctime));
 }
 
+void findDir(const char *start, const char *dirName, char **result)
+{
+    DIR *dir;
+    struct dirent *dir_curent;
+    if (!(dir = opendir(start)))
+        return;
+    strcpy(result[0], "1");
+    strcpy(result[1], "    Directorul cu numele '");
+    strcat(result[1], dirName);
+    strcat(result[1], "' nu a putut fi gasit!");
+
+    while ((dir_curent = readdir(dir)) != NULL)
+    {
+        char path[300];
+        if (strcmp(dir_curent->d_name, ".") && strcmp(dir_curent->d_name, ".."))
+        {
+            if (strcmp(dir_curent->d_name, dirName))
+            {
+                sprintf(path, "%s/%s", start, dir_curent->d_name);
+                findDir(path, dirName, result);
+            }
+            else
+            {
+                strcpy(result[0], "1");
+                strcpy(result[1], "Director gasit");
+                return;
+            }     
+        }
+    }
+    closedir(dir);
+}
+
 void myfind(const char *start, const char *fileName, char **result)
 {
     char **fileInfo = malloc(50 * sizeof(char *));
@@ -129,7 +161,7 @@ void myfind(const char *start, const char *fileName, char **result)
     {
         if (dir_curent->d_type == DT_DIR)
         {
-            char path[200];
+            char path[300];
             if (strcmp(dir_curent->d_name, ".") && strcmp(dir_curent->d_name, ".."))
             {
                 //snprintf(path, sizeof(path), "%s/%s", start, dir_curent->d_name);

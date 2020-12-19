@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
@@ -14,7 +15,7 @@
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
 #include "operations.h" //Pentru operarea cu directoare/fisiere (functionalitatile urmeaza a fi introduse in proiectul final)
-#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
+//#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* codul de eroare returnat de anumite apeluri */
 extern int errno;
@@ -34,30 +35,30 @@ void printCommands()
     printf("    - clistdirs                    // Afisare directoare client\n");
     printf("    - slistdirs                    // Afisare directoare server\n");
 
-    printf("    - cmkdir 'nume_director'       // Creare director client\n");
-    printf("    - smkdir 'nume_director'       // Creare director server\n");
-    printf("    - crmdir 'nume_director'       // Stergere director client\n");
-    printf("    - srmdir 'nume_director'       // Stergere director server\n");
+    printf("    - cmkdir nume_director         // Creare director client\n");
+    printf("    - smkdir nume_director         // Creare director server\n");
+    printf("    - crmdir nume_director         // Stergere director client\n");
+    printf("    - srmdir nume_director         // Stergere director server\n");
 
-    printf("    - ctouch 'nume_fisier'         // Creare fisier client\n");
-    printf("    - stouch 'nume_fisier'         // Creare fisier server\n");
-    printf("    - crm 'nume_fisier'            // Stergere fisier client\n");
-    printf("    - srm 'nume_fisier'            // Stergere fisier server\n");
+    printf("    - ctouch nume_fisier           // Creare fisier client\n");
+    printf("    - stouch nume_fisier           // Creare fisier server\n");
+    printf("    - crm nume_fisier              // Stergere fisier client\n");
+    printf("    - srm nume_fisier              // Stergere fisier server\n");
 
-    printf("    - crename 'nume1' -> 'nume2'   // Redenumire fisier/director client\n");
-    printf("    - srename 'nume1' -> 'nume2'   // Redenumire fisier/director server\n");
+    printf("    - crename nume1 -> nume2       // Redenumire fisier/director client\n");
+    printf("    - srename nume1 -> nume2       // Redenumire fisier/director server\n");
 
-    printf("    - cgoto 'nume_director'        // Schimbare director client\n");
-    printf("    - sgoto 'nume_director'        // Schimbare director server\n");
+    printf("    - cgoto nume_director          // Schimbare director client\n");
+    printf("    - sgoto nume_director          // Schimbare director server\n");
 
-    printf("    - cfind 'nume_fisier'          // Cautare fisier client\n");
-    printf("    - sfind 'nume_fisier'          // Cautare fisier server\n");
+    printf("    - cfind nume_fisier            // Cautare fisier client\n");
+    printf("    - sfind nume_fisier            // Cautare fisier server\n");
 
-    printf("    - cinfo 'nume_fisier'          // Afisare informatii fisier client\n");
-    printf("    - sinfo'nume_fisier'           // Afisare informatii fisier server\n");
+    printf("    - cinfo nume_fisier            // Afisare informatii fisier client\n");
+    printf("    - sinfo nume_fisier            // Afisare informatii fisier server\n");
 
-    printf("    - getfile 'nume_fisier'        // Transfer fisier server -> client\n");
-    printf("    - sendfile 'nume_fisier'       // Transfer fisier client -> server\n");
+    printf("    - getfile nume_fisier          // Transfer fisier server -> client\n");
+    printf("    - sendfile nume_fisier         // Transfer fisier client -> server\n");
 
     printf("    - exit                         // Terminarea conexiunii\n");
     printf("----------------------------------------------------------------------\n");
@@ -222,9 +223,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
     }
     else if (strncmp(comanda, "cgoto", 5) == 0)
     {
-        if (strcmp(param, "~") == 0)
-            strcpy(path, "~");
-        else if (strcmp(param, "..") == 0)
+        if (strcmp(param, "..") == 0)
         {
             for (i = strlen(path) - 1; i >= 0; i--)
             {
@@ -233,10 +232,26 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
             }
             strcpy(path + i, "");
         }
+        else if (strcmp(param, ".") == 0)
+        {
+        }
         else
         {
-            strcat(path, "/");
-            strcat(path, param);
+            findDir(path, param, rezultat);
+            if (strcmp(rezultat[1], "Director gasit") == 0)
+            {
+                strcat(path, "/");
+                strcat(path, param);
+            }
+            else
+            {
+                int lineNr = atoi(rezultat[0]);
+                for (i = 1; i <= lineNr; i++)
+                {
+                    printf("%s\n", rezultat[i]);
+                }
+                return true;
+            }
         }
 
         printf("[+] Path-ul curent este:\n");
@@ -333,7 +348,17 @@ int main(int argc, char *argv[])
         read(0, option, 200);
         option[strlen(option) - 1] = '\0';
 
-        if (strcmp(option, "Autentificare") == 0)
+        if (strcmp(option, "Creare cont") == 0)
+        {
+            if (write(sd, option, 200) <= 0)
+            {
+                perror("[+] Eroare la write() spre server.\n");
+                return errno;
+            }
+            create_account(sd);
+            break;
+        }
+        else if (strcmp(option, "Autentificare") == 0)
         {
             if (write(sd, option, 200) <= 0)
             {

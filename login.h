@@ -5,7 +5,9 @@
 #include <string.h>
 #include <math.h>
 #include "encryption.h"
+#include <sqlite3.h>
 
+/*
 char *getusername(char string[])
 {
     char rez[100];
@@ -35,49 +37,187 @@ char *getpassword(char string[])
     rez[len] = '\0';
     return strdup(rez);
 }
+*/
 
 char getInfo(char user[], char pass[])
 {
-    FILE *whitelist;
-    FILE *blacklist;
+    sqlite3 *db;
+    sqlite3_stmt *stmt = NULL;
 
-    whitelist = fopen("whitelist.txt", "r");
-    blacklist = fopen("blacklist.txt", "r");
-
-    if (whitelist == NULL || blacklist == NULL)
+    int rc = sqlite3_open("database.db", &db);
+    if (rc != SQLITE_OK)
     {
-        perror("[server] Eroare la deschidere fisiere.\n");
-        return errno;
+        perror("Baza de date nu a putut fi deschisa!\n");
+        return '0';
+    }
+    char sqlCmd[100], *err_msg = 0;
+
+    sprintf(sqlCmd, "SELECT username FROM blacklist WHERE username = '%s';", user);
+    rc = sqlite3_prepare_v2(db, sqlCmd, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        perror("Eroare la pregatirea interogarii!\n");
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '0';
+    }
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) //Daca username-ul este in blacklist
+    {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '2';
     }
 
-    char line[100];
-    size_t len = 0;
-    ssize_t bytes;
-    int i;
-    while (fgets(line, sizeof(line), blacklist) != NULL)
+    sprintf(sqlCmd, "SELECT username FROM whitelist WHERE username = '%s';", user);
+    rc = sqlite3_prepare_v2(db, sqlCmd, strlen(sqlCmd), &stmt, NULL);
+    if (rc != SQLITE_OK)
     {
-        line[strlen(line) - 1] = '\0';
-        if (strcmp(line, user) == 0)
-            return '2'; // User-ul este blacklisted!
-        bzero(line, 100);
+        perror("Eroare la pregatirea interogarii!\n");
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '0';
     }
-    fclose(blacklist);
-    char password[50];
-    while (fgets(line, sizeof(line), whitelist) != NULL)
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) //Daca username-ul este in whitelist
     {
-        line[strlen(line) - 1] = '\0';
-        if (strcmp(user, getusername(line)) == 0)
+        sprintf(sqlCmd, "SELECT password FROM whitelist WHERE password = '%s';", pass);
+        rc = sqlite3_prepare_v2(db, sqlCmd, -1, &stmt, NULL);
+        if (rc != SQLITE_OK)
         {
-            strcpy(password, getpassword(line));
-            //secure(pass);
-            if (strcmp(password, pass) == 0)
-                return '1'; // Parola corecta
+            perror("Eroare la pregatirea interogarii!\n");
+            sqlite3_finalize(stmt);
+            sqlite3_close(db);
+            return '0';
         }
-        bzero(line, 100);
-        bzero(password, 50);
+        rc = sqlite3_step(stmt);
+        if (rc == SQLITE_ROW) //Daca parola este corecta
+        {
+            sqlite3_finalize(stmt);
+            sqlite3_close(db);
+            return '1';
+        }
     }
-    fclose(whitelist);
     return '0'; // Parola gresita
+}
+
+char insertAccount(char user[], char pass[])
+{
+    sqlite3 *db;
+    sqlite3_stmt *stmt = NULL;
+
+    int rc = sqlite3_open("database.db", &db);
+    if (rc != SQLITE_OK)
+    {
+        perror("Baza de date nu a putut fi deschisa!\n");
+        return '0';
+    }
+    char sqlCmd[100], *err_msg = 0;
+
+    sprintf(sqlCmd, "SELECT username FROM blacklist WHERE username = '%s';", user);
+    rc = sqlite3_prepare_v2(db, sqlCmd, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        perror("Eroare la pregatirea interogarii!\n");
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '0';
+    }
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) //Daca username-ul exista in blacklist
+    {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '2';
+    }
+
+    sprintf(sqlCmd, "SELECT username FROM whitelist WHERE username = '%s';", user);
+    rc = sqlite3_prepare_v2(db, sqlCmd, -1, &stmt, NULL);
+    if (rc != SQLITE_OK)
+    {
+        perror("Eroare la pregatirea interogarii!\n");
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '0';
+    }
+    rc = sqlite3_step(stmt);
+    if (rc == SQLITE_ROW) //Daca username-ul exista in whitelist
+    {
+        sqlite3_finalize(stmt);
+        sqlite3_close(db);
+        return '2';
+    }
+
+    sprintf(sqlCmd, "INSERT INTO whitelist VALUES('%s', '%s');", user, pass);
+    rc = sqlite3_exec(db, sqlCmd, 0, 0, &err_msg);
+    if (rc != SQLITE_OK)
+    {
+        sqlite3_close(db);
+        return '0';
+    }
+    sqlite3_close(db);
+    return '1';
+}
+
+void create_account(int sd)
+{
+    char value;
+    char username[100], parola[100];
+    while (1)
+    {
+        printf("---------------------------------------------\n");
+        printf("[+] Va rugam sa va introduceti datele cerute...\n");
+    create:
+        printf("[+] username: ");
+        fflush(stdout);
+        bzero(username, 100);
+        read(0, username, 100);
+        username[strlen(username) - 1] = '\0';
+
+        if (write(sd, username, sizeof(username)) < 0)
+        {
+            perror("[+] Eroare la scriere user spre server.\n");
+            return;
+        }
+
+        printf("[+] parola: ");
+        fflush(stdout);
+        bzero(parola, 100);
+        read(0, parola, 100);
+        parola[strlen(parola) - 1] = '\0';
+
+        secure(parola);
+        if (write(sd, parola, sizeof(parola)) < 0)
+        {
+            perror("[+] Eroare la scriere pass spre server.\n");
+            return;
+        }
+
+        if (read(sd, &value, sizeof(value)) < 0)
+        {
+            perror("[+] Eroare la primire rezultat.\n");
+            return;
+        }
+
+        if (value == '2')
+        {
+            printf("---------------------------------------------\n");
+            printf("[+] Username-ul deja exista! Introduceti un username diferit...\n");
+            fflush(stdout);
+            goto create;
+        }
+        else if (value == '0')
+        {
+            printf("---------------------------------------------\n");
+            printf("[+] Contul nu a putut fi creat! Mai incercati...\n");
+            fflush(stdout);
+            goto create;
+        }
+        else
+            break;
+    }
+    printf("---------------------------------------------\n");
+    printf("[+] Contul a fost creat cu succes!\n");
 }
 
 void authenticate(int sd)
