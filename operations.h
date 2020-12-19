@@ -86,7 +86,7 @@ void mystat(const char *fileName, char **result)
         break;
     }
 
-    snprintf(result[3], 200, "    Numarul de link-uri hard ale fisierului: %d", file_stats.st_nlink);
+    snprintf(result[3], 200, "    Numarul de link-uri hard ale fisierului: %ld", file_stats.st_nlink);
     snprintf(result[2], 200, "    Dimensiunea fisierului: %d octeti", (int)file_stats.st_size);
     snprintf(result[4], 200, "    Numarul de block-uri alocate fisierului: %d", (int)file_stats.st_blocks);
 
@@ -105,21 +105,12 @@ void mystat(const char *fileName, char **result)
 
     //DATE
     snprintf(result[7], 200, "    Data ultimei accesari: %s", ctime(&file_stats.st_atime));
-    //result[7][strlen(result[7] - 1)] = '\0';
     snprintf(result[8], 200, "    Data ultimei modificari: %s", ctime(&file_stats.st_mtime));
-    //result[8][strlen(result[8] - 1)] = '\0';
     snprintf(result[9], 200, "    Data ultimei actualizari a statusului: %s", ctime(&file_stats.st_ctime));
-    //result[9][strlen(result[9] - 1)] = '\0';
-    int length = 0;
-    for (i = 2; i < 11; i++)
-        length += strlen(result[i]);
-    //snprintf(result[1], 200, "[Lungime raspuns: %d]", length);
-    return;
 }
 
 void myfind(const char *start, const char *fileName, char **result)
 {
-    //char** result = malloc(50 * sizeof(char *));
     char **fileInfo = malloc(50 * sizeof(char *));
     int i;
     for (i = 0; i < 50; i++)
@@ -130,10 +121,9 @@ void myfind(const char *start, const char *fileName, char **result)
         return;
 
     strcpy(result[0], "1");
-    strcpy(result[1], "Fisierul cu numele '");
+    strcpy(result[1], "    Fisierul cu numele '");
     strcat(result[1], fileName);
     strcat(result[1], "' nu a putut fi gasit!");
-    //snprintf(result[1], 200, "[Lungime raspuns: %d]", strlen(result[2]));
 
     while ((dir_curent = readdir(dir)) != NULL)
     {
@@ -142,7 +132,8 @@ void myfind(const char *start, const char *fileName, char **result)
             char path[200];
             if (strcmp(dir_curent->d_name, ".") && strcmp(dir_curent->d_name, ".."))
             {
-                snprintf(path, sizeof(path), "%s/%s", start, dir_curent->d_name);
+                //snprintf(path, sizeof(path), "%s/%s", start, dir_curent->d_name);
+                sprintf(path, "%s/%s", start, dir_curent->d_name);
                 myfind(path, fileName, result);
             }
         }
@@ -154,9 +145,9 @@ void myfind(const char *start, const char *fileName, char **result)
                 snprintf(filePath, 1000, "%s/%s", start, fileName);
                 mystat(filePath, fileInfo);
                 strcpy(result[0], "12");
-                strcpy(result[1], "    Fisierul cu numele ");
+                strcpy(result[1], "    Fisierul cu numele '");
                 strcat(result[1], fileName);
-                strcat(result[1], " a fost gasit!");
+                strcat(result[1], "' a fost gasit!");
                 strcpy(result[2], "    Acesta are path-ul : ");
                 strcat(result[2], start);
                 strcpy(result[3], " ");
@@ -169,11 +160,7 @@ void myfind(const char *start, const char *fileName, char **result)
                 strcpy(result[10], fileInfo[7]);
                 strcpy(result[11], fileInfo[8]);
                 strcpy(result[12], fileInfo[9]);
-                int length = 0;
-                for (i = 2; i < 14; i++)
-                    length += strlen(result[i]);
-                //snprintf(result[1], 200, "[Lungime raspuns: %d]", length);
-                exit;
+                return;
             }
         }
     }
@@ -190,7 +177,7 @@ int fsize(const char *filename)
     return -1;
 }
 
-void sendfile(const char *fileName, int to, struct sockaddr_in toStruct)
+void sendfile(const char *fileName, int to)
 {
     char buff[8192];
 
@@ -198,8 +185,8 @@ void sendfile(const char *fileName, int to, struct sockaddr_in toStruct)
     input = fopen(fileName, "rb");
     if (input == NULL)
     {
-        perror("[server]Eroare la deschidere fisier.\n");
-        return errno;
+        perror("Eroare la deschidere fisier.\n");
+        return;
     }
 
     size_t read_bytes, write_bytes;
@@ -216,21 +203,20 @@ void sendfile(const char *fileName, int to, struct sockaddr_in toStruct)
     }
     bzero(buff, sizeof(buff));
 
-
     int i;
     for (i = 0; i < nrBlocks; i++)
     {
         read_bytes = fread(buff, 1, sizeof(buff), input);
         if (read_bytes < 0)
         {
-            perror("[server]Eroare la citire din fisier.\n");
-            return errno;
+            perror("Eroare la citire din fisier.\n");
+            return;
         }
         write_bytes = write(to, buff, read_bytes);
         if (write_bytes < 0)
         {
-            perror("[server]Eroare la scriere catre client.\n");
-            return errno;
+            perror("Eroare la scriere catre client.\n");
+            return;
         }
         bzero(buff, sizeof(buff));
     }

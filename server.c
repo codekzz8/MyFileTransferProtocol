@@ -210,7 +210,11 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "sinfo", 5) == 0)
     {
-        mystat(param, rezultat);
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+
+        mystat(currentPath, rezultat);
     }
     else if (strncmp(comanda, "getfile", 7) == 0)
     {
@@ -218,7 +222,7 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
         strcat(currentPath, "/");
         strcat(currentPath, param);
 
-        sendfile(currentPath, client, from);
+        sendfile(currentPath, fd);
     }
     else if (strncmp(comanda, "sendfile", 8) == 0)
         printf("-----------------------------------------------\n");
@@ -240,7 +244,7 @@ int receiveAndSend(int fd, char path[])
     for (i = 0; i < 50; i++)
         rezultat[i] = malloc(200 * sizeof(char));
 
-    bytes = read(fd, msg, sizeof(buffer));
+    bytes = read(fd, msg, sizeof(msg));
     if (bytes < 0)
     {
         perror("Eroare la read() de la client.\n");
@@ -250,7 +254,7 @@ int receiveAndSend(int fd, char path[])
 
     commandManager(fd, msg, path, rezultat);
 
-    if (strncmp(msg, "sendfile", 8) == 0)
+    if (strncmp(msg, "sendfile", 8) == 0) //Daca e sendfile
     {
         char filePath[100];
         char buff[8192];
@@ -272,7 +276,6 @@ int receiveAndSend(int fd, char path[])
 
         read_bytes = read(fd, buff, sizeof(buff));
         nrBlocks = atoi(buff);
-        printf("nr blocks : %d\n");
 
         bzero(buff, sizeof(buff));
         for (i = 0; i < nrBlocks; i++)
@@ -280,7 +283,7 @@ int receiveAndSend(int fd, char path[])
             read_bytes = read(fd, buff, sizeof(buff));
             if (read_bytes < 0)
             {
-                perror("[client]Eroare la read() de la server.\n");
+                perror("Eroare la read() de la server.\n");
                 return errno;
             }
             write_bytes = fwrite(buff, 1, read_bytes, output);
@@ -288,7 +291,7 @@ int receiveAndSend(int fd, char path[])
         }
         fclose(output);
     }
-    else if (strncmp(msg, "getfile", 7))
+    else if (strncmp(msg, "getfile", 7)) //Daca nu e getfile
     {
         int nrLines;
         if (write(fd, rezultat[0], bytes) < 0)
@@ -298,7 +301,6 @@ int receiveAndSend(int fd, char path[])
         }
         //nrLines = rezultat[0][0] - '0';
         nrLines = atoi(rezultat[0]);
-        printf("lines = %d\n", nrLines);
         for (i = 1; i <= nrLines; i++)
         {
             if (write(fd, rezultat[i], bytes) < 0)
@@ -312,6 +314,10 @@ int receiveAndSend(int fd, char path[])
             return -1;
         return bytes;
     }
+    for (i = 0; i < 50; i++)
+        free(rezultat[i]);
+    free(rezultat);
+    rezultat = NULL;
     return bytes;
 }
 
@@ -429,7 +435,7 @@ int main()
             /* a venit un client, acceptam conexiunea */
             client = accept(sd, (struct sockaddr *)&from, &len);
             //strcpy(paths[client], "~");
-            strcpy(paths[client], path);
+            strcpy(paths[client], path); //paths[client] = path-ul serverului pentru fiecare client
             status[client][0] = '0';
             authenticated[client] = false;
 

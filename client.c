@@ -255,7 +255,12 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
     }
     else if (strncmp(comanda, "cinfo", 5) == 0)
     {
-        mystat(param, rezultat);
+        strcpy(currentPath, path);
+        strcat(currentPath, "/");
+        strcat(currentPath, param);
+
+        mystat(currentPath, rezultat);
+
         int lineNr = atoi(rezultat[0]);
         for (int i = 1; i <= lineNr; i++)
         {
@@ -317,7 +322,7 @@ int main(int argc, char *argv[])
 
     printf("-=/ MyFileTransferProtocol \\=-\n");
     printf("---------------------------------------------\n");
-    printf("[+] Introduceti cifra corespunzatoare urmatoarelor optiuni:\n");
+    printf("[+] Introduceti optiunea dorita:\n");
     printf("[+] 1. Creare cont\n");
     printf("[+] 2. Autentificare\n");
     printf("[+] 3. Exit\n");
@@ -335,7 +340,7 @@ int main(int argc, char *argv[])
                 perror("[+] Eroare la write() spre server.\n");
                 return errno;
             }
-            authenticate(sd, server);
+            authenticate(sd);
             break;
         }
         else if (strcmp(option, "Exit") == 0)
@@ -424,7 +429,7 @@ int main(int argc, char *argv[])
                 strcpy(filePath, path);
                 strcat(filePath, "/");
                 strcat(filePath, strchr(msg, ' ') + 1);
-                sendfile(filePath, sd, server);
+                sendfile(filePath, sd);
                 printf("[+] Fisierul cu numele %s a fost trimis!\n", strchr(msg, ' ') + 1);
             }
             else if (strstr(msg, "getfile"))
@@ -434,7 +439,7 @@ int main(int argc, char *argv[])
                     perror("[+] Eroare la write() spre server.\n");
                     return errno;
                 }
-
+                printf("[+] Comanda getfile trimisa\n");
                 char filePath[100];
                 strcpy(filePath, path);
                 strcat(filePath, "/");

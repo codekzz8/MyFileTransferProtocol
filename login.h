@@ -80,7 +80,7 @@ char getInfo(char user[], char pass[])
     return '0'; // Parola gresita
 }
 
-void authenticate(int sd, struct sockaddr_in server)
+void authenticate(int sd)
 {
     char value;
     char username[100], parola[100];
