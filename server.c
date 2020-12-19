@@ -213,7 +213,7 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
         }
         strcpy(rezultat[0], "2");
         sprintf(rezultat[1], "[+] Path-ul curent este:");
-        sprintf(rezultat[2], "%s.", path);
+        sprintf(rezultat[2], "    %s.", path);
     }
     else if (strncmp(comanda, "sfind", 5) == 0)
     {
@@ -301,6 +301,29 @@ int receiveAndSend(int fd, char path[])
             bzero(buff, sizeof(buff));
         }
         fclose(output);
+
+        char perm[3];
+        read_bytes = read(fd, buff, sizeof(buff));
+        if (read_bytes < 0)
+        {
+            perror("[client]Eroare la read() de la server.\n");
+            return errno;
+        }
+        strcpy(perm, buff);
+
+        int perms = atoi(perm);
+
+        if (perms)
+        {
+            int pid = fork();
+            if (pid == 0)
+            {
+                execlp("chmod", "chmod", perms, filePath, NULL);
+                exit(0);
+            }
+            else
+                wait(NULL);
+        }
     }
     else if (strncmp(msg, "getfile", 7)) //Daca nu e getfile
     {

@@ -98,6 +98,7 @@ char getInfo(char user[], char pass[])
             return '1';
         }
     }
+    sqlite3_close(db);
     return '0'; // Parola gresita
 }
 

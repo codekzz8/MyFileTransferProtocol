@@ -135,7 +135,7 @@ void findDir(const char *start, const char *dirName, char **result)
                 strcpy(result[0], "1");
                 strcpy(result[1], "Director gasit");
                 return;
-            }     
+            }
         }
     }
     closedir(dir);
@@ -209,6 +209,38 @@ int fsize(const char *filename)
     return -1;
 }
 
+int fpermissions(const char *filename)
+{
+    struct stat file_stats;
+
+    struct stat st;
+    stat(filename, &st);
+    int perm = 0;
+
+    if (st.st_mode & S_IXOTH)
+        perm += 1;
+    if (st.st_mode & S_IWOTH)
+        perm += 2;
+    if (st.st_mode & S_IROTH)
+        perm += 4;
+
+    if (st.st_mode & S_IXGRP)
+        perm = 10 + perm;
+    if (st.st_mode & S_IWGRP)
+        perm = 20 + perm;
+    if (st.st_mode & S_IRGRP)
+        perm = 40 + perm;
+
+    if (st.st_mode & S_IXUSR)
+        perm = 100 + perm;
+    if (st.st_mode & S_IWUSR)
+        perm = 200 + perm;
+    if (st.st_mode & S_IRUSR)
+        perm = 400 + perm;
+
+    return perm;
+}
+
 void sendfile(const char *fileName, int to)
 {
     char buff[8192];
@@ -253,4 +285,12 @@ void sendfile(const char *fileName, int to)
         bzero(buff, sizeof(buff));
     }
     fclose(input);
+
+    sprintf(buff, "%d", fpermissions(fileName));
+    write_bytes = write(to, buff, sizeof(buff));
+    if (write_bytes < 0)
+    {
+        perror("Eroare la scriere catre client.\n");
+        return;
+    }
 }

@@ -62,6 +62,7 @@ void printCommands()
 
     printf("    - exit                         // Terminarea conexiunii\n");
     printf("----------------------------------------------------------------------\n");
+    fflush(stdout);
 }
 
 bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char path[])
@@ -91,6 +92,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
     {
         printf("[+] Path-ul curent este:\n");
         printf("    %s\n", path);
+        fflush(stdout);
         return true;
     }
     else if (strcmp(comanda, "clistdirs") == 0)
@@ -103,6 +105,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         {
             printf("%s\n", rezultat[i]);
         }
+        fflush(stdout);
         for (i = 0; i < 50; i++)
             free(rezultat[i]);
         free(rezultat);
@@ -129,6 +132,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         else
             strcpy(dir_name, param);
         printf("[+] Directorul cu numele %s a fost creat cu succes!\n", dir_name);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "crmdir", 6) == 0) //123
@@ -151,6 +155,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         else
             strcpy(dir_name, param);
         printf("[+] Directorul cu numele %s a fost sters cu succes!\n", dir_name);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "ctouch", 6) == 0)
@@ -170,6 +175,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
             wait(NULL);
         }
         printf("[+] Fisierul cu numele %s a fost creat cu succes!\n", param);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "crm", 3) == 0)
@@ -192,6 +198,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         else
             strcpy(fis_name, param);
         printf("[+] Fisierul cu numele %s a fost sters cu succes!\n", fis_name);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "crename", 7) == 0)
@@ -219,6 +226,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         }
         wait(NULL);
         printf("[+] Fisierul %s a fost redenumit in %s.\n", param, strrchr(newName, '/') + 1);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "cgoto", 5) == 0)
@@ -256,6 +264,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
 
         printf("[+] Path-ul curent este:\n");
         printf("    %s\n", path);
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "cfind", 5) == 0)
@@ -266,6 +275,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         {
             printf("%s\n", rezultat[i]);
         }
+        fflush(stdout);
         return true;
     }
     else if (strncmp(comanda, "cinfo", 5) == 0)
@@ -281,6 +291,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
         {
             printf("%s\n", rezultat[i]);
         }
+        fflush(stdout);
         return true;
     }
     return false;
@@ -341,6 +352,7 @@ int main(int argc, char *argv[])
     printf("[+] 1. Creare cont\n");
     printf("[+] 2. Autentificare\n");
     printf("[+] 3. Exit\n");
+    fflush(stdout);
     while (1)
     {
         printf("[+] Optiune: ");
@@ -398,6 +410,7 @@ int main(int argc, char *argv[])
         else
         {
             printf("[+] Comanda nu exista!\n");
+            fflush(stdout);
         }
     }
 
@@ -456,6 +469,7 @@ int main(int argc, char *argv[])
                 strcat(filePath, strchr(msg, ' ') + 1);
                 sendfile(filePath, sd);
                 printf("[+] Fisierul cu numele %s a fost trimis!\n", strchr(msg, ' ') + 1);
+                fflush(stdout);
             }
             else if (strstr(msg, "getfile"))
             {
@@ -464,7 +478,6 @@ int main(int argc, char *argv[])
                     perror("[+] Eroare la write() spre server.\n");
                     return errno;
                 }
-                printf("[+] Comanda getfile trimisa\n");
                 char filePath[100];
                 strcpy(filePath, path);
                 strcat(filePath, "/");
@@ -497,7 +510,29 @@ int main(int argc, char *argv[])
                     bzero(buff, sizeof(buff));
                 }
                 fclose(output);
+                char perm[3];
+                read_bytes = read(sd, buff, sizeof(buff));
+                if (read_bytes < 0)
+                {
+                    perror("[client]Eroare la read() de la server.\n");
+                    return errno;
+                }
+                strcpy(perm, buff);
+
+                int perms = atoi(perm);
+
+                if (perms)
+                {
+                    int pid = fork();
+                    if (pid == 0)
+                    {
+                        execlp("chmod", "chmod", perms, filePath, NULL);
+                        exit(0);
+                    }
+                    else wait(NULL);
+                }
                 printf("[+] Fisierul cu numele %s a fost primit!\n", strchr(msg, ' ') + 1);
+                fflush(stdout);
             }
             else if (!clientCommand(sd, server, msg, path))
             {
