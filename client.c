@@ -14,7 +14,7 @@
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
-#include "operations.h" //Pentru operarea cu directoare/fisiere (functionalitatile urmeaza a fi introduse in proiectul final)
+#include "operations_new.h" //Pentru operarea cu directoare/fisiere (functionalitatile urmeaza a fi introduse in proiectul final)
 //#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* codul de eroare returnat de anumite apeluri */
@@ -269,7 +269,7 @@ bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char pat
     }
     else if (strncmp(comanda, "cfind", 5) == 0)
     {
-        myfind(path, param, rezultat);
+        myfind(path, param, rezultat, 2);
         int lineNr = atoi(rezultat[0]);
         for (i = 1; i <= lineNr; i++)
         {

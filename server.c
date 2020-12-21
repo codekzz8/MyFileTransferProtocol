@@ -14,7 +14,7 @@
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
-#include "operations.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
+#include "operations_new.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
 //#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
 
 /* portul folosit */
@@ -217,7 +217,7 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "sfind", 5) == 0)
     {
-        myfind(path, param, rezultat);
+        myfind(path, param, rezultat, 2);
     }
     else if (strncmp(comanda, "sinfo", 5) == 0)
     {
