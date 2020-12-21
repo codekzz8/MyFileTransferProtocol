@@ -284,6 +284,7 @@ void sendfile(const char *fileName, int to)
     fclose(input);
 
     sprintf(buff, "%d", fpermissions(fileName));
+    printf("%s\n", buff);
     write_bytes = write(to, buff, sizeof(buff));
     if (write_bytes < 0)
     {

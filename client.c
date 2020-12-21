@@ -510,7 +510,7 @@ int main(int argc, char *argv[])
                     bzero(buff, sizeof(buff));
                 }
                 fclose(output);
-                char perm[3];
+                char perm[4];
                 read_bytes = read(sd, buff, sizeof(buff));
                 if (read_bytes < 0)
                 {
@@ -518,15 +518,17 @@ int main(int argc, char *argv[])
                     return errno;
                 }
                 strcpy(perm, buff);
-
                 int perms = atoi(perm);
-
+                char p[4], temp[5];
+                strcpy(p, "0");
+                sprintf(temp, "%d", perms);
+                strcat(p, temp);
                 if (perms)
                 {
                     int pid = fork();
                     if (pid == 0)
                     {
-                        execlp("chmod", "chmod", perms, filePath, NULL);
+                        execlp("chmod", "chmod", p, filePath, NULL);
                         exit(0);
                     }
                     else wait(NULL);
