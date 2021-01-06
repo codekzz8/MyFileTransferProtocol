@@ -7,38 +7,6 @@
 #include "encryption.h"
 #include <sqlite3.h>
 
-/*
-char *getusername(char string[])
-{
-    char rez[100];
-    int i, len = 0;
-    for (i = 0; string[i]; i++)
-    {
-        if (string[i] == '#')
-            break;
-        rez[i] = string[i];
-    }
-    rez[i] = '\0';
-    return strdup(rez);
-}
-
-char *getpassword(char string[])
-{
-    char rez[100];
-    int i, len = 0;
-    bool flag = false;
-    for (i = 0; string[i]; i++)
-    {
-        if (flag == true)
-            rez[len++] = string[i];
-        if (string[i] == '#')
-            flag = true;
-    }
-    rez[len] = '\0';
-    return strdup(rez);
-}
-*/
-
 char getInfo(char user[], char pass[])
 {
     sqlite3 *db;

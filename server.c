@@ -106,11 +106,6 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
         {
             return;
         }
-        /*
-        strcpy(currentPath, path);
-        strcat(currentPath, "/");
-        strcat(currentPath, param);
-        */
 
         int pid = fork();
         if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
@@ -377,7 +372,6 @@ int receiveAndSend(int fd, char path[])
             perror("[server] Eroare la write() catre client.\n");
             return 0;
         }
-        //nrLines = rezultat[0][0] - '0';
         nrLines = atoi(rezultat[0]);
         for (i = 1; i <= nrLines; i++)
         {

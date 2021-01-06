@@ -43,16 +43,12 @@ void listdir(char path[], int space, char **rezultat, int lineNr) //lineNr este 
 void mystat(const char *fileName, char **result)
 {
     int r = 50, c = 200, i, j;
-    //result = malloc(r * sizeof(char *));
-    //for(i = 0; i < r; i++)
-    //result[i] = malloc(c * sizeof(char));
 
     //Daca fisierul nu exista
     if (access(fileName, F_OK) == -1)
     {
         strcpy(result[0], "1");
         snprintf(result[1], 200, "    Fisierul cu path-ul '%s' nu exista!", fileName);
-        //snprintf(result[1], 200, "[Lungime raspuns: %d]", strlen(result[2]));
         return;
     }
 

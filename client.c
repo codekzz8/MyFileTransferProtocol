@@ -149,12 +149,6 @@ bool clientCommand(char comanda[], char path[])
             return true;
         }
 
-        /*
-        strcpy(currentPath, path);
-        strcat(currentPath, "/");
-        strcat(currentPath, param);
-        */
-
         int pid = fork();
         if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
         {
