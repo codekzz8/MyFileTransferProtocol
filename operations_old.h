@@ -51,7 +51,7 @@ void mystat(const char *fileName, char **result)
     if (access(fileName, F_OK) == -1)
     {
         strcpy(result[0], "1");
-        snprintf(result[1], 200, "    Fisierul cu path-ul '%s' nu exista!", fileName);
+        snprintf(result[1], 200, "    Fisierul cu numele '%s' nu exista!", fileName);
         //snprintf(result[1], 200, "[Lungime raspuns: %d]", strlen(result[2]));
         return;
     }
@@ -116,7 +116,7 @@ void findDir(const char *start, const char *dirName, char **result)
     if (!(dir = opendir(start)))
         return;
     strcpy(result[0], "1");
-    strcpy(result[1], "[+] Directorul cu numele '");
+    strcpy(result[1], "    Directorul cu numele '");
     strcat(result[1], dirName);
     strcat(result[1], "' nu a putut fi gasit!");
 
@@ -141,59 +141,62 @@ void findDir(const char *start, const char *dirName, char **result)
     closedir(dir);
 }
 
-void myfind(const char *start, const char *fileName, char **result, int line)
+void myfind(const char *start, const char *fileName, char **result)
 {
-    int pipefd[2];
-    pipe(pipefd);
-    int pid = fork();
-    if (pid == 0)
+    char **fileInfo = malloc(50 * sizeof(char *));
+    int i;
+    for (i = 0; i < 50; i++)
+        fileInfo[i] = malloc(200 * sizeof(char));
+    DIR *dir;
+    struct dirent *dir_curent;
+    if (!(dir = opendir(start)))
+        return;
+
+    strcpy(result[0], "1");
+    strcpy(result[1], "    Fisierul cu numele '");
+    strcat(result[1], fileName);
+    strcat(result[1], "' nu a putut fi gasit!");
+
+    while ((dir_curent = readdir(dir)) != NULL)
     {
-        close(pipefd[0]);
-        dup2(pipefd[1], 1);
-        dup2(pipefd[1], 2);
-        close(pipefd[1]);
-        char currentPath[200];
-        strcpy(currentPath, start);
-        strcat(currentPath, "/");
-        strcat(currentPath, fileName);
-        execlp("find", "find", start, "-name", fileName, NULL);
-        exit(0);
-    }
-    else
-    {
-        wait(NULL);
-        close(pipefd[1]);
-        char buffer[200];
-        char temp[200];
-        bzero(buffer, 200);
-        int i, currentChar = 4;
-        while (read(pipefd[0], buffer, 200 > 0))
+        if (dir_curent->d_type == DT_DIR)
         {
-            if (buffer[0] == '\n')
+            char path[300];
+            if (strcmp(dir_curent->d_name, ".") && strcmp(dir_curent->d_name, ".."))
             {
-                result[line][currentChar] = '\0';
-                result[line][0] = result[line][1] = result[line][2] = result[line][3] = ' '; 
-                line++;
-                currentChar = 4;
+                //snprintf(path, sizeof(path), "%s/%s", start, dir_curent->d_name);
+                sprintf(path, "%s/%s", start, dir_curent->d_name);
+                myfind(path, fileName, result);
             }
-            else
+        }
+        else
+        {
+            if (strcmp(dir_curent->d_name, fileName) == 0)
             {
-                result[line][currentChar] = buffer[0];
-                currentChar++;
+                char filePath[1000];
+                snprintf(filePath, 1000, "%s/%s", start, fileName);
+                mystat(filePath, fileInfo);
+                strcpy(result[0], "12");
+                strcpy(result[1], "    Fisierul cu numele '");
+                strcat(result[1], fileName);
+                strcat(result[1], "' a fost gasit!");
+                strcpy(result[2], "    Acesta are path-ul : ");
+                strcat(result[2], start);
+                strcpy(result[3], " ");
+                strcpy(result[4], fileInfo[1]);
+                strcpy(result[5], fileInfo[2]);
+                strcpy(result[6], fileInfo[3]);
+                strcpy(result[7], fileInfo[4]);
+                strcpy(result[8], fileInfo[5]);
+                strcpy(result[9], fileInfo[6]);
+                strcpy(result[10], fileInfo[7]);
+                strcpy(result[11], fileInfo[8]);
+                strcpy(result[12], fileInfo[9]);
+                return;
             }
-            bzero(buffer, 200);
         }
     }
-    sprintf(result[0], "%d", line - 1);
-    if (line - 2 == 0)
-    {
-        strcpy(result[0], "1");
-        sprintf(result[1], "[+] Nu a fost gasit niciun fisier!");
-    }
-    else if (line - 2 == 1)
-        sprintf(result[1], "[+] A fost gasit un fisier! Acesta are path-ul:");
-    else
-        sprintf(result[1], "[+] Au fost gasite mai multe fisiere! Aceastea au urmatoarele path-uri:");
+    closedir(dir);
 }
 
 int fsize(const char *filename)
@@ -284,7 +287,6 @@ void sendfile(const char *fileName, int to)
     fclose(input);
 
     sprintf(buff, "%d", fpermissions(fileName));
-    printf("%s\n", buff);
     write_bytes = write(to, buff, sizeof(buff));
     if (write_bytes < 0)
     {

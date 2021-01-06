@@ -14,8 +14,7 @@
 /* Headere */
 #include "login.h" //Pentru verificare whitelist/blacklist + autentificare
 //#include "encryption.h" //Pentru criptarea parolei (este inclus in header-ul login.h)
-#include "operations_new.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
-//#include "find.h"       //Pentru cautarea unui fisier/afisarea de informatii despre un fisier
+#include "operations.h" //Pentru operarea cu directoare/fisiere (urmeaza a fi introdus in proiectul final)
 
 /* portul folosit */
 #define PORT 2728
@@ -96,9 +95,23 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "srmdir", 6) == 0) //123
     {
+        findDir(path, param, rezultat);
+        if (strcmp(rezultat[1], "Director gasit") == 0)
+        {
+            strcpy(currentPath, path);
+            strcat(currentPath, "/");
+            strcat(currentPath, param);
+        }
+        else
+        {
+            return;
+        }
+        /*
         strcpy(currentPath, path);
         strcat(currentPath, "/");
         strcat(currentPath, param);
+        */
+
         int pid = fork();
         if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
         {
@@ -137,9 +150,14 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "srm", 3) == 0)
     {
+        myfind(path, param, rezultat, 2);
+        if (strcmp(rezultat[1], "[+] Nu a fost gasit niciun fisier!") == 0)
+            return;
+
         strcpy(currentPath, path);
         strcat(currentPath, "/");
         strcat(currentPath, param);
+
         int pid = fork();
         if (pid == 0) //proces copil in care se executa comanda "mkdir 'nume_dir'"
         {
@@ -148,17 +166,21 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
         }
         //proces parinte
         wait(NULL);
-        char dir_name[20];
-        bzero(dir_name, 20);
+        char file_name[20];
+        bzero(file_name, 20);
         if (strchr(comanda, '/'))
-            strcpy(dir_name, strrchr(param, '/') + 1);
+            strcpy(file_name, strrchr(param, '/') + 1);
         else
-            strcpy(dir_name, param);
+            strcpy(file_name, param);
         strcpy(rezultat[0], "1");
-        sprintf(rezultat[1], "[+] Directorul cu numele %s a fost sters cu succes!", dir_name);
+        sprintf(rezultat[1], "[+] Fisierul cu numele %s a fost sters cu succes!", file_name);
     }
     else if (strncmp(comanda, "srename", 7) == 0)
     {
+        myfind(path, param, rezultat, 2);
+        if (strcmp(rezultat[1], "[+] Nu a fost gasit niciun fisier!") == 0)
+            return;
+
         char newName[100];
         strcpy(currentPath, path);
         strcat(currentPath, "/");
@@ -221,6 +243,10 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "sinfo", 5) == 0)
     {
+        myfind(path, param, rezultat, 2);
+        if (strcmp(rezultat[1], "[+] Nu a fost gasit niciun fisier!") == 0)
+            return;
+
         strcpy(currentPath, path);
         strcat(currentPath, "/");
         strcat(currentPath, param);
@@ -229,6 +255,12 @@ void commandManager(int fd, char comanda[], char path[], char **rezultat)
     }
     else if (strncmp(comanda, "getfile", 7) == 0)
     {
+        myfind(path, param, rezultat, 2);
+        if (strcmp(rezultat[1], "[+] Nu a fost gasit niciun fisier!") == 0)
+        {
+            return;
+        }
+
         strcpy(currentPath, path);
         strcat(currentPath, "/");
         strcat(currentPath, param);
@@ -273,59 +305,71 @@ int receiveAndSend(int fd, char path[])
         strcat(filePath, "/");
         strcat(filePath, strchr(msg, ' ') + 1);
 
-        FILE *output = fopen(filePath, "wb");
-        output = fopen(filePath, "wb");
-        if (output == NULL)
+        if (read(fd, buff, sizeof(buff)) < 0)
         {
-            perror("Eroare la deschidere fisier!\n");
-            exit(1);
+            perror("[server] Eroare la read() de la client!\n");
+            return errno;
         }
-
-        size_t read_bytes, write_bytes;
-
-        int i, nrBlocks;
-
-        read_bytes = read(fd, buff, sizeof(buff));
-        nrBlocks = atoi(buff);
-
-        bzero(buff, sizeof(buff));
-        for (i = 0; i < nrBlocks; i++)
+        printf("Semnal primit!\n");
+        if (strcmp(buff, "[+] Nu a fost gasit niciun fisier!") == 0)
+            return 1;
+        else
         {
+            FILE *output = fopen(filePath, "wb");
+            output = fopen(filePath, "wb");
+            if (output == NULL)
+            {
+                perror("Eroare la deschidere fisier!\n");
+                exit(1);
+            }
+
+            size_t read_bytes, write_bytes;
+
+            int i, nrBlocks;
+
+            bzero(buff, sizeof(buff));
+            read_bytes = read(fd, buff, sizeof(buff));
+            nrBlocks = atoi(buff);
+
+            bzero(buff, sizeof(buff));
+            for (i = 0; i < nrBlocks; i++)
+            {
+                read_bytes = read(fd, buff, sizeof(buff));
+                if (read_bytes < 0)
+                {
+                    perror("Eroare la read() de la server.\n");
+                    return errno;
+                }
+                write_bytes = fwrite(buff, 1, read_bytes, output);
+                bzero(buff, sizeof(buff));
+            }
+            fclose(output);
+
+            char perm[3];
             read_bytes = read(fd, buff, sizeof(buff));
             if (read_bytes < 0)
             {
-                perror("Eroare la read() de la server.\n");
+                perror("[client]Eroare la read() de la server.\n");
                 return errno;
             }
-            write_bytes = fwrite(buff, 1, read_bytes, output);
-            bzero(buff, sizeof(buff));
-        }
-        fclose(output);
+            strcpy(perm, buff);
 
-        char perm[3];
-        read_bytes = read(fd, buff, sizeof(buff));
-        if (read_bytes < 0)
-        {
-            perror("[client]Eroare la read() de la server.\n");
-            return errno;
-        }
-        strcpy(perm, buff);
+            int perms = atoi(perm);
 
-        int perms = atoi(perm);
-
-        if (perms)
-        {
-            int pid = fork();
-            if (pid == 0)
+            if (perms)
             {
-                execlp("chmod", "chmod", perms, filePath, NULL);
-                exit(0);
+                int pid = fork();
+                if (pid == 0)
+                {
+                    execlp("chmod", "chmod", perms, filePath, NULL);
+                    exit(0);
+                }
+                else
+                    wait(NULL);
             }
-            else
-                wait(NULL);
         }
     }
-    else if (strncmp(msg, "getfile", 7)) //Daca nu e getfile
+    else if (strncmp(msg, "getfile", 7) || (strstr(msg, "getfile") && strcmp(rezultat[1], "[+] Nu a fost gasit niciun fisier!") == 0)) //Daca nu e getfile
     {
         int nrLines;
         if (write(fd, rezultat[0], bytes) < 0)
@@ -370,7 +414,7 @@ int main()
     int len;                   /* lungimea structurii sockaddr_in */
 
     char paths[10][100]; //path-urile pentru fiecare client
-    char status[10][1];  //0 = nu e logat | 1 = s-a logat | 2 = este pe blacklist
+    char status[20][1];  //0 = nu e logat | 1 = s-a logat | 2 = este pe blacklist
     char mesaj[200];
     bool authenticated[10]; //1 = s-a dorit autentificarea | 0 = s-a dorit deconectarea
     char path[100];
@@ -469,9 +513,9 @@ int main()
             /* a venit un client, acceptam conexiunea */
             client = accept(sd, (struct sockaddr *)&from, &len);
             //strcpy(paths[client], "~");
-            strcpy(paths[client - 5], path); //paths[client] = path-ul serverului pentru fiecare client
-            status[client - 5][0] = '0';
-            authenticated[client - 5] = false;
+            strcpy(paths[client], path); //paths[client] = path-ul serverului pentru fiecare client
+            status[client][0] = '0';
+            authenticated[client] = false;
 
             /* eroare la acceptarea conexiunii de la un client */
             if (client < 0)
@@ -495,7 +539,7 @@ int main()
             /* este un socket de citire pregatit? */
             if (fd != sd && FD_ISSET(fd, &readfds))
             {
-                if (status[fd - 5][0] == '0' && authenticated[fd - 5] == false) // Daca se cere deconectarea
+                if (status[fd][0] == '0' && authenticated[fd] == false) // Daca se cere deconectarea
                 {
                     if (read(fd, mesaj, sizeof(mesaj)) < 0)
                     {
@@ -505,12 +549,12 @@ int main()
                     printf("Mesajul primit : %s\n", mesaj);
                     if (strcmp(mesaj, "Exit") == 0)
                     {
-                        status[fd - 5][0] = '2';
+                        status[fd][0] = '2';
                         goto disconnect;
                     }
                     authenticated[fd] = true;
                 }
-                if (status[fd - 5][0] == '0') //Daca se cere creare cont/autentificare
+                if (status[fd][0] == '0') //Daca se cere creare cont/autentificare
                 {
                     char user[100], pass[100];
                     bzero(user, 100);
@@ -537,11 +581,11 @@ int main()
                     }
                     if (val == '1')
                     {
-                        status[fd - 5][0] = '1';
+                        status[fd][0] = '1';
                         printf("[server] Utilizatorul %d s-a autentificat cu succes!\n", fd);
                     }
                 }
-                else if (receiveAndSend(fd, paths[fd - 5]) < 0)
+                else if (receiveAndSend(fd, paths[fd]) < 0)
                 {
                 disconnect:
                     printf("[server] S-a deconectat clientul cu descriptorul %d.\n", fd);
