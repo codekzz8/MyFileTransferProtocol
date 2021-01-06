@@ -65,7 +65,7 @@ void printCommands()
     fflush(stdout);
 }
 
-bool clientCommand(int sd, struct sockaddr_in toServer, char comanda[], char path[])
+bool clientCommand(char comanda[], char path[])
 {
     int i;
     char rez[200], param[100], currentPath[100];
@@ -536,7 +536,7 @@ int main(int argc, char *argv[])
                 printf("[+] Fisierul cu numele %s a fost primit!\n", strchr(msg, ' ') + 1);
                 fflush(stdout);
             }
-            else if (!clientCommand(sd, server, msg, path))
+            else if (!clientCommand(msg, path))
             {
                 if (write(sd, msg, 200) <= 0)
                 {

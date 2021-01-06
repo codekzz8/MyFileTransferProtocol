@@ -469,9 +469,9 @@ int main()
             /* a venit un client, acceptam conexiunea */
             client = accept(sd, (struct sockaddr *)&from, &len);
             //strcpy(paths[client], "~");
-            strcpy(paths[client], path); //paths[client] = path-ul serverului pentru fiecare client
-            status[client][0] = '0';
-            authenticated[client] = false;
+            strcpy(paths[client - 5], path); //paths[client] = path-ul serverului pentru fiecare client
+            status[client - 5][0] = '0';
+            authenticated[client - 5] = false;
 
             /* eroare la acceptarea conexiunii de la un client */
             if (client < 0)
@@ -495,7 +495,7 @@ int main()
             /* este un socket de citire pregatit? */
             if (fd != sd && FD_ISSET(fd, &readfds))
             {
-                if (status[fd][0] == '0' && authenticated[fd] == false) // Daca se cere deconectarea
+                if (status[fd - 5][0] == '0' && authenticated[fd - 5] == false) // Daca se cere deconectarea
                 {
                     if (read(fd, mesaj, sizeof(mesaj)) < 0)
                     {
@@ -505,12 +505,12 @@ int main()
                     printf("Mesajul primit : %s\n", mesaj);
                     if (strcmp(mesaj, "Exit") == 0)
                     {
-                        status[fd][0] = '2';
+                        status[fd - 5][0] = '2';
                         goto disconnect;
                     }
                     authenticated[fd] = true;
                 }
-                if (status[fd][0] == '0') //Daca se cere creare cont/autentificare
+                if (status[fd - 5][0] == '0') //Daca se cere creare cont/autentificare
                 {
                     char user[100], pass[100];
                     bzero(user, 100);
@@ -537,11 +537,11 @@ int main()
                     }
                     if (val == '1')
                     {
-                        status[fd][0] = '1';
+                        status[fd - 5][0] = '1';
                         printf("[server] Utilizatorul %d s-a autentificat cu succes!\n", fd);
                     }
                 }
-                else if (receiveAndSend(fd, paths[fd]) < 0)
+                else if (receiveAndSend(fd, paths[fd - 5]) < 0)
                 {
                 disconnect:
                     printf("[server] S-a deconectat clientul cu descriptorul %d.\n", fd);
